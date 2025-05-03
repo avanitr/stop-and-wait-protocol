@@ -1,0 +1,61 @@
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define PORT 3000
+#define BUFFER_SIZE 100
+
+int main() {
+    int c, len;
+    char rmsg[BUFFER_SIZE], smsg[BUFFER_SIZE];
+    struct sockaddr_in server;
+
+    int frame = 0, in_frame;
+
+    c = socket(AF_INET, SOCK_DGRAM, 0);
+    if (c < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    server.sin_family = AF_INET;
+    server.sin_port = htons(PORT);
+    server.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    len = sizeof(server);
+
+    while (1) {
+        frame++;
+        char frame_str[10];
+        sprintf(frame_str, "%d", frame);
+
+        printf("Enter frame number (or type 'quit' to exit): ");
+        fgets(smsg, BUFFER_SIZE, stdin);
+        smsg[strcspn(smsg, "\n")] = '\0';
+        if (strcmp(smsg, "quit") == 0) {
+            sendto(c, smsg, BUFFER_SIZE, 0, (struct sockaddr*)&server, len);
+            break;
+        }
+        sendto(c, smsg, BUFFER_SIZE, 0, (struct sockaddr*)&server, len);
+        recvfrom(c, rmsg, BUFFER_SIZE, 0, (struct sockaddr*)&server, &len);
+
+        if (strcmp(rmsg, "quit") == 0) {
+            printf("Server terminated the connection.\n");
+            break;
+        }
+
+        printf("Message from Server: %s\n", rmsg); 
+        sscanf(rmsg, "%d", &in_frame);
+
+        if (in_frame == frame) {
+            printf("Acknowledgment %d Received\n", in_frame);
+        } else {
+            frame--; 
+        }
+    }
+    close(c);
+    return 0;
+}
