@@ -1,0 +1,62 @@
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define PORT 3000
+#define BUFFER_SIZE 100
+int main()
+ {
+    int s, len;
+    char smsg[BUFFER_SIZE], rmsg[BUFFER_SIZE];
+    struct sockaddr_in server, client;
+    int frame = 0, in_frame = 0;
+    s = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    server.sin_family = AF_INET;
+    server.sin_port = htons(PORT);
+    server.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    if (bind(s, (struct sockaddr*)&server, sizeof(server)) < 0) {
+        perror("Bind failed");
+        close(s);
+        exit(EXIT_FAILURE);
+    }
+
+    len = sizeof(client);
+    while (1) {
+        frame++;
+        recvfrom(s, rmsg, BUFFER_SIZE, 0, (struct sockaddr*)&client, &len);
+        
+        if (strcmp(rmsg, "quit") == 0) {
+            printf("Client requested termination. Exiting...\n");
+            break;
+        }
+
+        printf("Message from client: %s\n", rmsg); 
+        sscanf(rmsg, "%d", &in_frame);
+
+        if (in_frame == frame) {
+            printf("Frame %d Received\n", in_frame);
+            strcpy(smsg, rmsg);
+            sendto(s, smsg, BUFFER_SIZE, 0, (struct sockaddr*)&client, len);
+        } else {
+            frame--; 
+            printf("Frame number mismatch\n");
+            strcpy(smsg, "Resend Frame after : ");
+            char frame_str[10];
+            sprintf(frame_str, "%d", frame);
+            strcat(smsg, frame_str);
+            sendto(s, smsg, BUFFER_SIZE, 0, (struct sockaddr*)&client, len);
+        }
+    }
+
+    close(s);
+    return 0;
+}
